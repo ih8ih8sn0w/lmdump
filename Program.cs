@@ -19,11 +19,11 @@ namespace lmdump
 			{
                 //var lm = new Lumen(@"C:\s4explore\extract\data\ui\lumen\com_hdr\com_hdr.lm");
                 Console.WriteLine("Please provide an input file to continue");
-			}
+		}
 			else
-			{
-				var lm = new Lumen(args[0]);
-			}
+		{
+			var lm = new Lumen(args[0]);
+		}
         }
     }
 }
