@@ -9,21 +9,22 @@ namespace lmdump
     static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
-            //Application.EnableVisualStyles();
-            //Application.SetCompatibleTextRenderingDefault(false);
-            //Application.Run(new Form1());
-
-            if (args.Length == 0)
+			//Application.EnableVisualStyles();
+			//Application.SetCompatibleTextRenderingDefault(false);
+			//Application.Run(new Form1());
+			if (args.Length == 0)
 			{
-                //var lm = new Lumen(@"C:\s4explore\extract\data\ui\lumen\com_hdr\com_hdr.lm");
-                Console.WriteLine("Please provide an input file to continue");
-		}
+				var lm = new Lumen(@"C:/users/ih8ih8sn0w/desktop/chara.lm");
+				Console.WriteLine("Default chara.lm loaded");
+			}
 			else
-		{
-			var lm = new Lumen(args[0]);
-		}
+			{
+				var lm = new Lumen(args[0]);
+				Console.WriteLine("This file was loaded: " + args[0]);
+			}
+            //var x = 43;
         }
     }
 }

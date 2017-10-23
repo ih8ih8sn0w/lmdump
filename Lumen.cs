@@ -1156,7 +1156,7 @@ namespace lmdump
             // TODO: write correct filesize in header. 
             // It isn't checked by the game, but what the hell, right?
             header.Write(o);
-
+			
             writeSymbols(o);
             writeColors(o);
             writeTransforms(o);
