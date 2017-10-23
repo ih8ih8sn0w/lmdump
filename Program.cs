@@ -15,8 +15,15 @@ namespace lmdump
             //Application.SetCompatibleTextRenderingDefault(false);
             //Application.Run(new Form1());
 
-            var lm = new Lumen(@"C:\s4explore\extract\data\ui\lumen\com_hdr\com_hdr.lm");
-            var x = 43;
+            if (args.Length == 0)
+			{
+                //var lm = new Lumen(@"C:\s4explore\extract\data\ui\lumen\com_hdr\com_hdr.lm");
+                Console.WriteLine("Please provide an input file to continue");
+			}
+			else
+			{
+				var lm = new Lumen(args[0]);
+			}
         }
     }
 }
