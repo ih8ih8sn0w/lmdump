@@ -95,6 +95,10 @@ namespace lmdump
 
             ptr += size;
         }
+        public void reverse(uint size)
+		{
+			ptr -= size;
+		}
     }
 
     public class OutputBuffer
