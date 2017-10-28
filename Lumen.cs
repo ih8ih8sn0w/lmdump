@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
@@ -177,6 +177,8 @@ namespace lmdump
             public int nameId;
             public int atlasId;
             public short unk1;
+			public short numVerts;
+			public int numIndices;
 
             public Vertex[] verts;
             public short[] indices;
@@ -196,8 +198,8 @@ namespace lmdump
                 atlasId = f.readInt();
                 unk1 = f.readShort();
 
-                int numVerts = f.readShort();
-                int numIndices = f.readInt();
+                numVerts = f.readShort();
+                numIndices = f.readInt();
 
                 verts = new Vertex[numVerts];
                 indices = new short[numIndices];
@@ -259,8 +261,9 @@ namespace lmdump
         {
             public int id;
             public int unk1;
-            public int texlistEntry;
+            public int boundingBoxID;
             public int unk2;
+			//public int numGraphics;
 
             public Graphic[] graphics;
 
@@ -278,8 +281,9 @@ namespace lmdump
             {
                 id = f.readInt();
                 unk1 = f.readInt();
-                texlistEntry = f.readInt();
+                boundingBoxID = f.readInt();
                 unk2 = f.readInt();
+				//numGraphics = f.readInt();
 
                 int numGraphics = f.readInt();
                 graphics = new Graphic[numGraphics];
@@ -298,7 +302,7 @@ namespace lmdump
 
                 o.writeInt(id);
                 o.writeInt(unk1);
-                o.writeInt(texlistEntry);
+                o.writeInt(boundingBoxID);
                 o.writeInt(unk2);
                 o.writeInt(graphics.Length);
 
@@ -665,7 +669,7 @@ namespace lmdump
 
                 for (int i = 0; i < numLabels; i++)
                 {
-                    f.skip(0x08);
+                    f.skip(0x04);
 
                     labels[i] = new Label(f);
                 }
@@ -796,6 +800,7 @@ namespace lmdump
         public List<ShapeBounds> bounds { get; set; }
         public List<TextureAtlas> textureAtlases { get; set; }
         public List<Shape> shapes { get; set; }
+		public List<Graphic> graphics { get; set; }
         public List<DynamicText> texts { get; set; }
         public List<Sprite> sprites { get; set; }
 
@@ -818,6 +823,7 @@ namespace lmdump
             bounds = new List<ShapeBounds>();
             textureAtlases = new List<TextureAtlas>();
             shapes = new List<Shape>();
+			graphics = new List<Graphic>();
             texts = new List<DynamicText>();
             sprites = new List<Sprite>();
 
@@ -941,7 +947,7 @@ namespace lmdump
 
                             Console.WriteLine($"\t0x{i:X4}: # offset = 0x{offs:X2}");
                             Console.WriteLine($"\t\tposition: [{xform.M31}, {xform.M32}]");
-                            Console.WriteLine($"\t\trotation: {angleRads * (180 / Math.PI)}°");
+                            Console.WriteLine($"\t\trotation: {angleRads * (180 / Math.PI)}�");
                             Console.WriteLine($"\t\tscale: [{scaleX}, {scaleY}]\n");
 
                             transforms.Add(xform);
@@ -1008,8 +1014,66 @@ namespace lmdump
                         break;
 
                     case TagType.Shape:
-                        shapes.Add(new Shape(f));
-                        break;
+						Console.WriteLine("Shape\n{");
+						Shape shape = new Shape{
+							id = f.readInt(),
+							unk1 = f.readInt(),
+							boundingBoxID = f.readInt(),
+							unk2 = f.readInt()
+						};
+						Console.WriteLine($"\tID: {shape.id}");
+						Console.WriteLine($"\tUnk1: 0x{shape.unk1:X2}");
+						Console.WriteLine($"\tBounding Box ID: {shape.boundingBoxID}");
+						Console.WriteLine($"\tUnk2: 0x{shape.unk2:X2}");
+						//Console.WriteLine($"\tNum Graphics: {shape.numGraphics}");
+						Console.WriteLine("}");
+						f.skip(0x04);
+
+						break;
+
+					case TagType.Graphic:
+						Console.WriteLine("\tGraphic");
+						Console.WriteLine("\t\t{");
+						f.reverse(0x04);
+						Graphic graphic = new Graphic {
+							nameId = f.readInt(),
+							atlasId = f.readInt(),
+							unk1 = f.readShort(),
+							numVerts = f.readShort(),
+							numIndices = f.readInt(),
+						};
+						Vertex[] verts = new Vertex[graphic.numVerts];
+						short[] indices = new short[graphic.numIndices];
+						Console.WriteLine($"\t\tnameId: {graphic.nameId}");
+						Console.WriteLine($"\t\tatlasId: 0x{graphic.atlasId:X2}");
+						Console.WriteLine($"\t\tunk1: 0x{graphic.unk1:X2}");
+						Console.WriteLine($"\t\tnumVerts: {graphic.numVerts}");
+						Console.WriteLine($"\t\tnumIndicies: {graphic.numIndices}");
+
+						for (int i = 0; i < graphic.numVerts; i++)
+						{
+							verts[i] = new Vertex();
+							//verts[i].x = f.readFloat();
+							Console.WriteLine($"\t\tVert_{i} pos: [" + (verts[i].x = f.readFloat()) + "," + (verts[i].y = f.readFloat()) + "], uv: ["+ (verts[i].u = f.readFloat()) + "," + (verts[i].v = f.readFloat()) + "] }");
+							//verts[i].y = f.readFloat();
+							//verts[i].u = f.readFloat();
+							//verts[i].v = f.readFloat();
+						}
+						Console.Write("indices: [");
+						for (int i = 0; i < graphic.numIndices; i++)
+						{
+
+							Console.Write((indices[i] = f.readShort()) + ", ");
+						}
+						Console.Write("]\n");
+
+						// indices are padded to word boundaries
+						if ((graphic.numIndices % 2) != 0)
+						{
+							f.skip(0x02);
+						}
+
+						break;
 
                     case TagType.DefineEditText:
                         texts.Add(new DynamicText(f));
@@ -1019,7 +1083,14 @@ namespace lmdump
                         sprites.Add(new Sprite(f));
                         break;
 
-                    default:
+					case TagType.FrameLabel:
+						break;
+
+					case TagType.Keyframe:
+						break;
+
+
+					default:
                         throw new NotImplementedException($"Unhandled chunk id: 0x{(uint)chunkType:X} @ 0x{chunkOffset:X}");
                 }
             }
@@ -1156,7 +1227,7 @@ namespace lmdump
             // TODO: write correct filesize in header. 
             // It isn't checked by the game, but what the hell, right?
             header.Write(o);
-			
+
             writeSymbols(o);
             writeColors(o);
             writeTransforms(o);
