@@ -90,14 +90,18 @@ namespace lmdump
 
         public void skip(uint size)
         {
-            if (size + ptr > data.Length)
+			if (size + ptr > data.Length)
                 throw new IndexOutOfRangeException();
 
             ptr += size;
         }
-        public void reverse(uint size)
+		public void reverse(uint size)
 		{
 			ptr -= size;
+		}
+		public void location(uint size)
+		{
+			ptr += 0;
 		}
     }
 

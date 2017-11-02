@@ -2,12 +2,13 @@ using System;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace lmdump
 {
     public class Lumen
     {
-        public enum TagType : int
+		public enum TagType : int
         {
             Invalid = 0x0000,
 
@@ -42,7 +43,6 @@ namespace lmdump
 
             End = 0xFF00,
 
-            //
             Metadata = 0x8000,
         }
 
@@ -313,6 +313,12 @@ namespace lmdump
             }
         }
 
+		
+		public struct KeyFrame
+		{
+
+		}
+
         public struct DynamicText
         {
             public enum Alignment : short
@@ -392,9 +398,9 @@ namespace lmdump
             }
         }
 
-        public class Sprite
+        public class Sprite // movieclip
         {
-            public class Label
+            public class Label // currently broken by f.skip
             {
                 public int nameId;
                 public int startFrame;
@@ -407,23 +413,26 @@ namespace lmdump
 
                 public void Read(InputBuffer f)
                 {
-                    nameId = f.readInt();
+					uint size = Convert.ToUInt32(f.readInt());
+					f.skip(size * 4);
+					/*nameId = f.readInt();
                     startFrame = f.readInt();
-                    unk1 = f.readInt();
-                }
+                    unk1 = f.readInt();*/
+				}
 
                 public void Write(OutputBuffer o)
                 {
-                    o.writeInt((int)TagType.FrameLabel);
+                    /*o.writeInt((int)TagType.FrameLabel);
                     o.writeInt(3);
                     o.writeInt(nameId);
                     o.writeInt(startFrame);
-                    o.writeInt(unk1);
+                    o.writeInt(unk1);*/
                 }
             }
 
-            public class Placement
+            public class Placement // "place_object" in original lmdump?
             {
+
                 public int objectId;
                 public int placementId;
                 public int unk1;
@@ -440,7 +449,7 @@ namespace lmdump
                 public int colorId1;
                 public int colorId2;
 
-                //ColorMatrix colorMatrix = null;
+                //ColorMatrix colorMatrix = null; //commented before
                 public UnhandledTag colorMatrix = null;
                 public UnhandledTag unkF014 = null;
 
@@ -516,7 +525,7 @@ namespace lmdump
                 }
             }
 
-            public class Deletion
+            public class Deletion // "delete_object" in original lmdump?
             {
                 public int unk1;
                 public short mcObjectId; // or was it placement id?
@@ -529,10 +538,10 @@ namespace lmdump
 
                 public void Read(InputBuffer f)
                 {
-                    unk1 = f.readInt();
+					unk1 = f.readInt();
                     mcObjectId = (short)f.readShort();
                     unk2 = (short)f.readShort();
-                }
+				}
 
                 public void Write(OutputBuffer o)
                 {
@@ -544,7 +553,7 @@ namespace lmdump
                 }
             }
 
-            public class Action
+            public class Action // idek
             {
                 public int actionId;
                 public int unk1;
@@ -556,9 +565,9 @@ namespace lmdump
 
                 public void Read(InputBuffer f)
                 {
-                    actionId = f.readInt();
+					actionId = f.readInt();
                     unk1 = f.readInt();
-                }
+				}
 
                 public void Write(OutputBuffer o)
                 {
@@ -569,7 +578,7 @@ namespace lmdump
                 }
             }
 
-            public class Frame
+            public class Frame // "frame" in original lmdump?
             {
                 public int id;
 
@@ -588,7 +597,7 @@ namespace lmdump
 
                 public void Read(InputBuffer f)
                 {
-                    id = f.readInt();
+					id = f.readInt();
                     int numChildren = f.readInt();
 
                     for (int childId = 0; childId < numChildren; childId++)
@@ -608,7 +617,7 @@ namespace lmdump
                         {
                             placements.Add(new Placement(f));
                         }
-                    }
+				}
                 }
 
                 // NOTE: unlike other chunk write functions, this does not include the header
@@ -655,7 +664,7 @@ namespace lmdump
 
             public void Read(InputBuffer f)
             {
-                id = f.readInt();
+				id = f.readInt();
                 unk1 = f.readInt();
                 unk2 = f.readInt();
 
@@ -691,7 +700,7 @@ namespace lmdump
                         frames.Add(frame);
                     }
                 }
-            }
+			}
 
             public void Write(OutputBuffer o)
             {
@@ -814,8 +823,9 @@ namespace lmdump
         public UnhandledTag unkF00D;
 
         public Metadata metadata;
+		private string filePath;
 
-        public Lumen()
+		public Lumen()
         {
             header = new Header();
             symbols = new List<string>();
@@ -855,243 +865,258 @@ namespace lmdump
             header.unk12 = f.readInt();
             header.unk13 = f.readInt();
 
-            bool done = false;
+			filePath = (Convert.ToString(Path.GetDirectoryName(filename)));
+			File.WriteAllText(filePath + @"\Log.txt", String.Empty);
+
+
+			using (StreamWriter outputFile = new StreamWriter(filePath + @"\Log.txt", true))
+			{
+				bool done = false;
             while (!done)
             {
                 uint chunkOffset = f.ptr;
                 TagType chunkType = (TagType)f.readInt();
                 int chunkSize = f.readInt(); // in dwords!
+				{
 
-                switch (chunkType)
-                {
-                    case TagType.Invalid:
-                        // uhhh. i think there's a specific exception for this
-                        throw new Exception("Malformed file");
-
-                    case TagType.Symbols:
-                        int numSymbols = f.readInt();
-
-                        while (symbols.Count < numSymbols)
-                        {
-                            int len = f.readInt();
-
-                            symbols.Add(f.readString());
-                            f.skip(4 - (f.ptr % 4));
-                        }
-
-                        break;
-
-                    case TagType.Colors:
-                        int numColors = f.readInt();
-
-                        Console.WriteLine("Colors\n{");
-
-                        for (int i = 0; i < numColors; i++)
-                        {
-                            var offs = f.ptr;
-                            var color = new Color(f.readShort(), f.readShort(), f.readShort(), f.readShort());
-                            colors.Add(color);
-
-                            Console.WriteLine($"\t0x{i:X4}: {color} # offset = 0x{offs:X2}");
-                        }
-
-                        Console.WriteLine("}\n");
-                        break;
-
-                    case TagType.Unk000A:
-                        unk000A = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-                    case TagType.UnkF00A:
-                        unkF00A = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-                    case TagType.UnkF00B:
-                        unkF00B = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-                    case TagType.UnkF008:
-                        unkF008 = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-                    case TagType.UnkF009:
-                        unkF009 = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-                    case TagType.UnkF00D:
-                        unkF00D = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-                    case TagType.ActionScript:
-                        actionscript = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-
-                    case TagType.End:
-                        done = true;
-                        break;
-
-                    case TagType.Transforms:
-                        int numTransforms = f.readInt();
-
-                        Console.WriteLine("Transforms\n{");
-
-                        for (int i = 0; i < numTransforms; i++)
-                        {
-                            var offs = f.ptr;
-                            Transform xform = new Transform();
-                            xform.M11 = f.readFloat();
-                            xform.M12 = f.readFloat();
-                            xform.M21 = f.readFloat();
-                            xform.M22 = f.readFloat();
-                            xform.M31 = f.readFloat();
-                            xform.M32 = f.readFloat();
-
-                            var scaleX = Math.Sign(xform.M11) * Math.Sqrt(xform.M11 * xform.M11 + xform.M21 * xform.M21);
-                            var scaleY = Math.Sign(xform.M22) * Math.Sqrt(xform.M12 * xform.M12 + xform.M22 * xform.M22);
-
-                            var angleRads = Math.Atan2(xform.M21, xform.M22);
-
-                            Console.WriteLine($"\t0x{i:X4}: # offset = 0x{offs:X2}");
-                            Console.WriteLine($"\t\tposition: [{xform.M31}, {xform.M32}]");
-                            Console.WriteLine($"\t\trotation: {angleRads * (180 / Math.PI)}°");
-                            Console.WriteLine($"\t\tscale: [{scaleX}, {scaleY}]\n");
-
-                            transforms.Add(xform);
-                        }
-
-                        Console.WriteLine("}\n");
-
-                        break;
-
-                    case TagType.Positions:
-                        int numPositions = f.readInt();
-                        Console.WriteLine("Positions\n{");
-
-                        for (int i = 0; i < numPositions; i++)
-                        {
-                            var offs = f.ptr;
-                            var pos = new Vector2(f.readFloat(), f.readFloat());
-                            Console.WriteLine($"\t0x{i:X4}: [{pos.X}, {pos.Y}] # offset = 0x{offs:X2}");
-
-                            positions.Add(pos);
-                        }
-
-                        Console.WriteLine("}\n");
-
-                        break;
-
-                    case TagType.Bounds:
-                        int numBounds = f.readInt();
-
-                        for (int i = 0; i < numBounds; i++)
-                        {
-                            bounds.Add(new ShapeBounds(f.readFloat(), f.readFloat(), f.readFloat(), f.readFloat()));
-                        }
-                        break;
-
-                    case TagType.Properties:
-                        properties = new UnhandledTag(chunkType, chunkSize, f);
-                        break;
-
-                    case TagType.TextureAtlases:
-                        int numAtlases = f.readInt();
-
-                        Console.WriteLine("Atlases\n{");
-
-                        for (int i = 0; i < numAtlases; i++)
-                        {
-                            TextureAtlas atlas = new TextureAtlas();
-                            atlas.id = f.readInt();
-                            atlas.unk = f.readInt();
-                            atlas.width = f.readFloat();
-                            atlas.height = f.readFloat();
-                            Console.WriteLine("\t{");
-                            Console.WriteLine($"\t\tid = 0x{atlas.id:X2}");
-                            Console.WriteLine($"\t\tunk = 0x{atlas.unk:X2}");
-                            Console.WriteLine($"\t\twidth = {atlas.width}");
-                            Console.WriteLine($"\t\theight = {atlas.height}");
-                            Console.WriteLine("\t}\n");
-
-                            textureAtlases.Add(atlas);
-                        }
-
-                        Console.WriteLine("}\n");
-
-                        break;
-
-                    case TagType.Shape:
-						Console.WriteLine("Shape\n{");
-						Shape shape = new Shape{
-							id = f.readInt(),
-							unk1 = f.readInt(),
-							boundingBoxID = f.readInt(),
-							unk2 = f.readInt()
-						};
-						Console.WriteLine($"\tID: {shape.id}");
-						Console.WriteLine($"\tUnk1: 0x{shape.unk1:X2}");
-						Console.WriteLine($"\tBounding Box ID: {shape.boundingBoxID}");
-						Console.WriteLine($"\tUnk2: 0x{shape.unk2:X2}");
-						//Console.WriteLine($"\tNum Graphics: {shape.numGraphics}");
-						Console.WriteLine("}");
-						f.skip(0x04);
-
-						break;
-
-					case TagType.Graphic:
-						Console.WriteLine("\tGraphic");
-						Console.WriteLine("\t\t{");
-						f.reverse(0x04);
-						Graphic graphic = new Graphic {
-							nameId = f.readInt(),
-							atlasId = f.readInt(),
-							unk1 = f.readShort(),
-							numVerts = f.readShort(),
-							numIndices = f.readInt(),
-						};
-						Vertex[] verts = new Vertex[graphic.numVerts];
-						short[] indices = new short[graphic.numIndices];
-						Console.WriteLine($"\t\tnameId: {graphic.nameId}");
-						Console.WriteLine($"\t\tatlasId: 0x{graphic.atlasId:X2}");
-						Console.WriteLine($"\t\tunk1: 0x{graphic.unk1:X2}");
-						Console.WriteLine($"\t\tnumVerts: {graphic.numVerts}");
-						Console.WriteLine($"\t\tnumIndicies: {graphic.numIndices}");
-
-						for (int i = 0; i < graphic.numVerts; i++)
+						switch (chunkType)
 						{
-							verts[i] = new Vertex();
-							//verts[i].x = f.readFloat();
-							Console.WriteLine($"\t\tVert_{i} pos: [" + (verts[i].x = f.readFloat()) + "," + (verts[i].y = f.readFloat()) + "], uv: ["+ (verts[i].u = f.readFloat()) + "," + (verts[i].v = f.readFloat()) + "] }");
-							//verts[i].y = f.readFloat();
-							//verts[i].u = f.readFloat();
-							//verts[i].v = f.readFloat();
+							case TagType.Invalid:
+								// uhhh. i think there's a specific exception for this
+								throw new Exception("Malformed file");
+
+							case TagType.Symbols:
+								int numSymbols = f.readInt();
+								outputFile.WriteLine("Symbols\n\t{");
+
+								while (symbols.Count < numSymbols)
+								{
+									int len = f.readInt();
+
+									symbols.Add(f.readString());
+									f.reverse((Convert.ToUInt32(len)));
+									outputFile.WriteLine("\t\t" + f.readString());
+									f.skip(4 - (f.ptr % 4));
+								}
+								outputFile.WriteLine("\t}\n");
+
+								break;
+
+							case TagType.Colors:
+								int numColors = f.readInt();
+
+								outputFile.WriteLine("Colors\n\t{");
+
+								for (int i = 0; i < numColors; i++)
+								{
+									var offs = f.ptr;
+									var color = new Color(f.readShort(), f.readShort(), f.readShort(), f.readShort());
+									colors.Add(color);
+
+									outputFile.WriteLine($"\t\t0x{i:X4}: {color} # offset = 0x{offs:X2}");
+								}
+
+								outputFile.WriteLine("\t\t}\n");
+								break;
+
+							case TagType.Unk000A:
+								unk000A = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+							case TagType.UnkF00A:
+								unkF00A = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+							case TagType.UnkF00B:
+								unkF00B = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+							case TagType.UnkF008:
+								unkF008 = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+							case TagType.UnkF009:
+								unkF009 = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+							case TagType.UnkF00D:
+								unkF00D = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+							case TagType.ActionScript:
+								actionscript = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+
+							case TagType.End:
+								done = true;
+								break;
+
+							case TagType.Transforms:
+								int numTransforms = f.readInt();
+
+								outputFile.WriteLine("Transforms\n{");
+
+								for (int i = 0; i < numTransforms; i++)
+								{
+									var offs = f.ptr;
+									Transform xform = new Transform();
+									xform.M11 = f.readFloat();
+									xform.M12 = f.readFloat();
+									xform.M21 = f.readFloat();
+									xform.M22 = f.readFloat();
+									xform.M31 = f.readFloat();
+									xform.M32 = f.readFloat();
+
+									var scaleX = Math.Sign(xform.M11) * Math.Sqrt(xform.M11 * xform.M11 + xform.M21 * xform.M21);
+									var scaleY = Math.Sign(xform.M22) * Math.Sqrt(xform.M12 * xform.M12 + xform.M22 * xform.M22);
+
+									var angleRads = Math.Atan2(xform.M21, xform.M22);
+
+									outputFile.WriteLine($"\t0x{i:X4}: # offset = 0x{offs:X2}");
+									outputFile.WriteLine($"\t\tposition: [{xform.M31}, {xform.M32}]");
+									outputFile.WriteLine($"\t\trotation: {angleRads * (180 / Math.PI)}°");
+									outputFile.WriteLine($"\t\tscale: [{scaleX}, {scaleY}]\n");
+
+									transforms.Add(xform);
+								}
+
+								outputFile.WriteLine("}\n");
+
+								break;
+
+							case TagType.Positions:
+								int numPositions = f.readInt();
+								outputFile.WriteLine("Positions\n{");
+
+								for (int i = 0; i < numPositions; i++)
+								{
+									var offs = f.ptr;
+									var pos = new Vector2(f.readFloat(), f.readFloat());
+									outputFile.WriteLine($"\t0x{i:X4}: [{pos.X}, {pos.Y}] # offset = 0x{offs:X2}");
+
+									positions.Add(pos);
+								}
+
+								outputFile.WriteLine("}\n");
+
+								break;
+
+							case TagType.Bounds:
+								int numBounds = f.readInt();
+
+								for (int i = 0; i < numBounds; i++)
+								{
+									bounds.Add(new ShapeBounds(f.readFloat(), f.readFloat(), f.readFloat(), f.readFloat()));
+								}
+								break;
+
+							case TagType.Properties:
+								properties = new UnhandledTag(chunkType, chunkSize, f);
+								break;
+
+							case TagType.TextureAtlases:
+								int numAtlases = f.readInt();
+
+								outputFile.WriteLine("Atlases\n{");
+
+								for (int i = 0; i < numAtlases; i++)
+								{
+									TextureAtlas atlas = new TextureAtlas();
+									atlas.id = f.readInt();
+									atlas.unk = f.readInt();
+									atlas.width = f.readFloat();
+									atlas.height = f.readFloat();
+									outputFile.WriteLine("\t{");
+									outputFile.WriteLine($"\t\tid = 0x{atlas.id:X2}");
+									outputFile.WriteLine($"\t\tunk = 0x{atlas.unk:X2}");
+									outputFile.WriteLine($"\t\twidth = {atlas.width}");
+									outputFile.WriteLine($"\t\theight = {atlas.height}");
+									outputFile.WriteLine("\t}\n");
+
+									textureAtlases.Add(atlas);
+								}
+
+								outputFile.WriteLine("}\n");
+
+								break;
+
+							case TagType.Shape:
+								outputFile.WriteLine("Shape\n{");
+								Shape shape = new Shape
+								{
+									id = f.readInt(),
+									unk1 = f.readInt(),
+									boundingBoxID = f.readInt(),
+									unk2 = f.readInt()
+								};
+								outputFile.WriteLine($"\tID: {shape.id}");
+								outputFile.WriteLine($"\tUnk1: 0x{shape.unk1:X2}");
+								outputFile.WriteLine($"\tBounding Box ID: {shape.boundingBoxID}");
+								outputFile.WriteLine($"\tUnk2: 0x{shape.unk2:X2}");
+								//outputFile.WriteLine($"\tNum Graphics: {shape.numGraphics}");
+								outputFile.WriteLine("}\n\t\t{");
+								f.skip(0x04);
+
+								break;
+
+							case TagType.Graphic:
+								outputFile.WriteLine("\t\tGraphic");
+								outputFile.WriteLine("\t\t\t{");
+								f.reverse(0x04);
+								Graphic graphic = new Graphic
+								{
+									nameId = f.readInt(),
+									atlasId = f.readInt(),
+									unk1 = f.readShort(),
+									numVerts = f.readShort(),
+									numIndices = f.readInt(),
+								};
+								Vertex[] verts = new Vertex[graphic.numVerts];
+								short[] indices = new short[graphic.numIndices];
+								outputFile.WriteLine($"\t\t\tnameId: {graphic.nameId}");
+								outputFile.WriteLine($"\t\t\tatlasId: 0x{graphic.atlasId:X2}");
+								outputFile.WriteLine($"\t\t\tunk1: 0x{graphic.unk1:X2}");
+								outputFile.WriteLine($"\t\t\tnumVerts: {graphic.numVerts}");
+								outputFile.WriteLine($"\t\t\tnumIndicies: {graphic.numIndices}");
+
+								for (int i = 0; i < graphic.numVerts; i++)
+								{
+									verts[i] = new Vertex();
+									//verts[i].x = f.readFloat();
+									outputFile.WriteLine($"\t\t\tVert_{i} pos: [" + (verts[i].x = f.readFloat()) + "," + (verts[i].y = f.readFloat()) + "], uv: [" + (verts[i].u = f.readFloat()) + "," + (verts[i].v = f.readFloat()) + "] }");
+									//verts[i].y = f.readFloat();
+									//verts[i].u = f.readFloat();
+									//verts[i].v = f.readFloat();
+								}
+								outputFile.Write("\t\t\tindices: [");
+								for (int i = 0; i < graphic.numIndices; i++)
+								{
+
+									outputFile.Write((indices[i] = f.readShort()) + ", ");
+								}
+								outputFile.Write("]\n}\n");
+
+								// indices are padded to word boundaries
+								if ((graphic.numIndices % 2) != 0)
+								{
+									f.skip(0x02);
+								}
+
+								break;
+
+							case TagType.DefineEditText:
+								texts.Add(new DynamicText(f));
+								break;
+
+							case TagType.DefineSprite:
+								sprites.Add(new Sprite(f));
+								break;
+
+							case TagType.FrameLabel:
+								break;
+
+							case TagType.Keyframe:
+								break;
+
+
+							default:
+								throw new NotImplementedException($"Unhandled chunk id: 0x{(uint)chunkType:X} @ 0x{chunkOffset:X}");
 						}
-						Console.Write("indices: [");
-						for (int i = 0; i < graphic.numIndices; i++)
-						{
-
-							Console.Write((indices[i] = f.readShort()) + ", ");
-						}
-						Console.Write("]\n");
-
-						// indices are padded to word boundaries
-						if ((graphic.numIndices % 2) != 0)
-						{
-							f.skip(0x02);
-						}
-
-						break;
-
-                    case TagType.DefineEditText:
-                        texts.Add(new DynamicText(f));
-                        break;
-
-                    case TagType.DefineSprite:
-                        sprites.Add(new Sprite(f));
-                        break;
-
-					case TagType.FrameLabel:
-						break;
-
-					case TagType.Keyframe:
-						break;
-
-
-					default:
-                        throw new NotImplementedException($"Unhandled chunk id: 0x{(uint)chunkType:X} @ 0x{chunkOffset:X}");
+					}
                 }
             }
         }

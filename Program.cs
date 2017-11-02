@@ -1,30 +1,33 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using System.Diagnostics;
+using System.IO;
 
 namespace lmdump
 {
-    static class Program
-    {
-        [STAThread]
-        static void Main(string[] args)
-        {
-			//Application.EnableVisualStyles();
-			//Application.SetCompatibleTextRenderingDefault(false);
-			//Application.Run(new Form1());
+	static class Program
+	{
+		public static Lumen lm;
+
+		[STAThread]
+
+		static void Main(string[] args)
+		{
 			if (args.Length == 0)
 			{
-				var lm = new Lumen(@"C:/users/ih8ih8sn0w/desktop/chara.lm");
-				Console.WriteLine("Default chara.lm loaded");
+				lm = new Lumen(@"C:\Users\ih8ih8sn0w\Desktop\SSB4\Tools\Wii U\sm4shexplorer 0.07.1\extract\data\ui\lumen\other\other.lm");
+				Console.WriteLine("Default main.lm loaded");
+				Console.ReadLine();
 			}
 			else
 			{
-				var lm = new Lumen(args[0]);
+				lm = new Lumen(args[0]);
 				Console.WriteLine("This file was loaded: " + args[0]);
+				Console.ReadLine();
 			}
-            //var x = 43;
-        }
-    }
+		}
+		public static string GetPath()
+		{
+			return Convert.ToString(lm);
+		}
+	}
 }
