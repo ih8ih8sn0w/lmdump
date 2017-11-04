@@ -263,7 +263,7 @@ namespace lmdump
             public int unk1;
             public int boundingBoxID;
             public int unk2;
-			//public int numGraphics;
+			public int numGraphics;
 
             public Graphic[] graphics;
 
@@ -878,7 +878,6 @@ namespace lmdump
                 TagType chunkType = (TagType)f.readInt();
                 int chunkSize = f.readInt(); // in dwords!
 				{
-
 						switch (chunkType)
 						{
 							case TagType.Invalid:
@@ -913,7 +912,7 @@ namespace lmdump
 									var color = new Color(f.readShort(), f.readShort(), f.readShort(), f.readShort());
 									colors.Add(color);
 
-									outputFile.WriteLine($"\t\t0x{i:X4}: {color} # offset = 0x{offs:X2}");
+									outputFile.WriteLine($"\t\t0x{i:X4}: {color} # Offset = 0x{offs:X2}");
 								}
 
 								outputFile.WriteLine("\t\t}\n");
@@ -966,7 +965,7 @@ namespace lmdump
 
 									var angleRads = Math.Atan2(xform.M21, xform.M22);
 
-									outputFile.WriteLine($"\t0x{i:X4}: # offset = 0x{offs:X2}");
+									outputFile.WriteLine($"\t0x{i:X4}: # Offset = 0x{offs:X2}");
 									outputFile.WriteLine($"\t\tposition: [{xform.M31}, {xform.M32}]");
 									outputFile.WriteLine($"\t\trotation: {angleRads * (180 / Math.PI)}°");
 									outputFile.WriteLine($"\t\tscale: [{scaleX}, {scaleY}]\n");
@@ -986,7 +985,7 @@ namespace lmdump
 								{
 									var offs = f.ptr;
 									var pos = new Vector2(f.readFloat(), f.readFloat());
-									outputFile.WriteLine($"\t0x{i:X4}: [{pos.X}, {pos.Y}] # offset = 0x{offs:X2}");
+									outputFile.WriteLine($"\t0x{i:X4}: [{pos.X}, {pos.Y}] # Offset = 0x{offs:X2}");
 
 									positions.Add(pos);
 								}
@@ -1010,19 +1009,22 @@ namespace lmdump
 
 							case TagType.TextureAtlases:
 								int numAtlases = f.readInt();
+								var offset = f.ptr;
 
 								outputFile.WriteLine("Atlases\n{");
 
 								for (int i = 0; i < numAtlases; i++)
 								{
+									var offs = f.ptr;
 									TextureAtlas atlas = new TextureAtlas();
 									atlas.id = f.readInt();
 									atlas.unk = f.readInt();
 									atlas.width = f.readFloat();
 									atlas.height = f.readFloat();
-									outputFile.WriteLine("\t{");
+									outputFile.Write("\t{ ");
+									outputFile.WriteLine($" # Offset = 0x{offs:X2}");
 									outputFile.WriteLine($"\t\tid = 0x{atlas.id:X2}");
-									outputFile.WriteLine($"\t\tunk = 0x{atlas.unk:X2}");
+									outputFile.WriteLine($"\t\tunk = 0x{atlas.unk:X8}");
 									outputFile.WriteLine($"\t\twidth = {atlas.width}");
 									outputFile.WriteLine($"\t\theight = {atlas.height}");
 									outputFile.WriteLine("\t}\n");
@@ -1035,31 +1037,34 @@ namespace lmdump
 								break;
 
 							case TagType.Shape:
-								outputFile.WriteLine("Shape\n{");
+								var shapeOffset = f.ptr;
+								outputFile.WriteLine($"Shape # Offset = 0x{shapeOffset:X2}");
+								outputFile.WriteLine("{\n\t{");
 								Shape shape = new Shape
 								{
 									id = f.readInt(),
 									unk1 = f.readInt(),
 									boundingBoxID = f.readInt(),
-									unk2 = f.readInt()
+									unk2 = f.readInt(),
+									numGraphics = f.readInt(),
 								};
-								outputFile.WriteLine($"\tID: {shape.id}");
-								outputFile.WriteLine($"\tUnk1: 0x{shape.unk1:X2}");
-								outputFile.WriteLine($"\tBounding Box ID: {shape.boundingBoxID}");
-								outputFile.WriteLine($"\tUnk2: 0x{shape.unk2:X2}");
-								//outputFile.WriteLine($"\tNum Graphics: {shape.numGraphics}");
-								outputFile.WriteLine("}\n\t\t{");
-								f.skip(0x04);
+								outputFile.WriteLine($"\t\tID: {shape.id}");
+								outputFile.WriteLine($"\t\tUnk1: 0x{shape.unk1:X8}");
+								outputFile.WriteLine($"\t\tBounding Box ID: {shape.boundingBoxID}");
+								outputFile.WriteLine($"\t\tUnk2: 0x{shape.unk2:X8}");
+								//outputFile.WriteLine($"\t\tNumGraphics: {shape.numGraphics}");
+								outputFile.WriteLine("\t}\n");
+								outputFile.WriteLine($"\tGraphics: {shape.numGraphics}");
+								outputFile.WriteLine("\t[");
 
 								break;
 
 							case TagType.Graphic:
-								outputFile.WriteLine("\t\tGraphic");
-								outputFile.WriteLine("\t\t\t{");
-								f.reverse(0x04);
+								var GraphicOffset = f.ptr;
+								outputFile.WriteLine($"\t\tGraphic # Offset = 0x{GraphicOffset:X2}");
+								outputFile.WriteLine("\t\t{");
 								Graphic graphic = new Graphic
 								{
-									nameId = f.readInt(),
 									atlasId = f.readInt(),
 									unk1 = f.readShort(),
 									numVerts = f.readShort(),
@@ -1067,33 +1072,54 @@ namespace lmdump
 								};
 								Vertex[] verts = new Vertex[graphic.numVerts];
 								short[] indices = new short[graphic.numIndices];
-								outputFile.WriteLine($"\t\t\tnameId: {graphic.nameId}");
 								outputFile.WriteLine($"\t\t\tatlasId: 0x{graphic.atlasId:X2}");
-								outputFile.WriteLine($"\t\t\tunk1: 0x{graphic.unk1:X2}");
-								outputFile.WriteLine($"\t\t\tnumVerts: {graphic.numVerts}");
-								outputFile.WriteLine($"\t\t\tnumIndicies: {graphic.numIndices}");
+								outputFile.WriteLine($"\t\t\tUnk1: 0x{graphic.unk1:X8}");
+								//outputFile.WriteLine($"\t\t\tnumVerts: {graphic.numVerts}");
+								//outputFile.WriteLine($"\t\t\tnumIndicies: {graphic.numIndices}");
+								outputFile.WriteLine("\t\t\tVerts:\n\t\t\t[");
 
 								for (int i = 0; i < graphic.numVerts; i++)
 								{
 									verts[i] = new Vertex();
-									//verts[i].x = f.readFloat();
-									outputFile.WriteLine($"\t\t\tVert_{i} pos: [" + (verts[i].x = f.readFloat()) + "," + (verts[i].y = f.readFloat()) + "], uv: [" + (verts[i].u = f.readFloat()) + "," + (verts[i].v = f.readFloat()) + "] }");
-									//verts[i].y = f.readFloat();
-									//verts[i].u = f.readFloat();
-									//verts[i].v = f.readFloat();
+									outputFile.Write("\t\t\t\t{ ");
+									outputFile.Write($"pos: [" + (verts[i].x = f.readFloat()) + "," + (verts[i].y = f.readFloat()) + "], uv: [" + (verts[i].u = f.readFloat()) + "," + (verts[i].v = f.readFloat()) + "]");
+									if ((i + 1) != graphic.numVerts)
+									{
+										outputFile.Write(" },\n");
+									}
+									else
+									{
+										outputFile.Write(" }");
+									}
 								}
-								outputFile.Write("\t\t\tindices: [");
+								outputFile.Write("\n\t\t\t]\n\t\t\tindices: [");
 								for (int i = 0; i < graphic.numIndices; i++)
 								{
-
-									outputFile.Write((indices[i] = f.readShort()) + ", ");
+									if ((i + 1) != graphic.numIndices)
+									{
+										outputFile.Write((indices[i] = f.readShort()) + ", ");
+									}
+									else
+									{
+										outputFile.Write((indices[i] = f.readShort()));
+									}
 								}
-								outputFile.Write("]\n}\n");
+								outputFile.Write("]\n\t\t}\n");
 
 								// indices are padded to word boundaries
 								if ((graphic.numIndices % 2) != 0)
 								{
 									f.skip(0x02);
+								}
+
+								if ((f.readInt() == 0xF024))
+								{
+									f.reverse(0x04);
+								}
+								else
+								{
+									outputFile.WriteLine("\t]\n}\n");
+									f.reverse(0x04);
 								}
 
 								break;
