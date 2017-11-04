@@ -1083,25 +1083,19 @@ namespace lmdump
 									verts[i] = new Vertex();
 									outputFile.Write("\t\t\t\t{ ");
 									outputFile.Write($"pos: [" + (verts[i].x = f.readFloat()) + "," + (verts[i].y = f.readFloat()) + "], uv: [" + (verts[i].u = f.readFloat()) + "," + (verts[i].v = f.readFloat()) + "]");
+									outputFile.Write(" }");
 									if ((i + 1) != graphic.numVerts)
 									{
-										outputFile.Write(" },\n");
-									}
-									else
-									{
-										outputFile.Write(" }");
+										outputFile.Write(",\n");
 									}
 								}
 								outputFile.Write("\n\t\t\t]\n\t\t\tindices: [");
 								for (int i = 0; i < graphic.numIndices; i++)
 								{
+									outputFile.Write((indices[i] = f.readShort()));
 									if ((i + 1) != graphic.numIndices)
 									{
-										outputFile.Write((indices[i] = f.readShort()) + ", ");
-									}
-									else
-									{
-										outputFile.Write((indices[i] = f.readShort()));
+										outputFile.Write(", ");
 									}
 								}
 								outputFile.Write("]\n\t\t}\n");
